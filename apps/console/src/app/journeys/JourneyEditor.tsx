@@ -168,7 +168,13 @@ function JourneyEditorContent({ appId, journeyId, initialName, initialGraph, sta
   const currentInput = (): JourneyDraftInput => ({ name: name.trim(), definition });
 
   return <main className="j-editor">
-    <JourneyTopbar current={journeyId ? "저니 편집" : "새 저니"} actions={statusEditable ? <>
+    <h1 className="sr-only">{journeyId ? "저니 편집" : "새 저니 만들기"}</h1>
+    <JourneyTopbar current={<span className="j-editor-current">
+      <label htmlFor="journey-name" className="sr-only">저니 이름</label>
+      <input id="journey-name" className="j-topbar-name" value={name} maxLength={200} placeholder="새 저니 이름"
+        disabled={!editable} onChange={(event) => { clearFeedback(); setName(event.target.value); }} />
+      <JourneyStatus status={status} />
+    </span>} actions={statusEditable ? <>
       <span className="j-save-state" role="status">{busy ? "처리 중…" : dirty ? "저장 전" : <><JourneyIcon name="check" size={14} />저장됨</>}</span>
       <button type="button" className="j-button j-undo-button" disabled={!editable || !history.length} onClick={undo}
         title="이전 편집으로 되돌리기"><JourneyIcon name="undo" size={16} /><span>되돌리기</span></button>
@@ -181,14 +187,6 @@ function JourneyEditorContent({ appId, journeyId, initialName, initialGraph, sta
         onClick={() => { clearFeedback(); pause.mutate(); }}>{pause.isPending ? "일시정지 중…" : "일시정지하고 편집"}</button>}
       {journeyId && <Link href={`/journeys/${journeyId}/report`} className="j-button"><JourneyIcon name="chart" size={16} />리포트 보기</Link>}
     </>} />
-
-    <section className="j-editor-heading" aria-label="저니 정보"><div className="j-editor-name-row">
-      <h1 className="sr-only">{journeyId ? "저니 편집" : "새 저니 만들기"}</h1>
-      <label htmlFor="journey-name" className="sr-only">저니 이름</label>
-      <input id="journey-name" className="j-name-input" value={name} maxLength={200} placeholder="새 저니 이름을 입력하세요" disabled={!editable}
-        onChange={(event) => { clearFeedback(); setName(event.target.value); }} />
-      <JourneyStatus status={status} />
-    </div><p>{statusEditable ? "고객의 행동에 따라, 더 자연스럽게 이어지는 흐름을 설계하세요." : "실행 흐름과 메시지를 확인할 수 있습니다. 활성 · 보관 저니는 편집할 수 없습니다."}</p></section>
 
     {status === "paused" && <div className="j-feedback" role="status"><JourneyIcon name="info" size={18} /><span>
       일시정지 중에도 대기 제한시간은 흐릅니다. 기존 고객은 재개 후 진입 당시의 버전으로 계속 진행합니다.
@@ -224,7 +222,7 @@ function JourneyEditorContent({ appId, journeyId, initialName, initialGraph, sta
     </div><div className="j-flow-summary" aria-label="저니 구성 요약">
       <div><span>메시지</span><strong>{messageCount}<small>개</small></strong></div>
       <div className="j-duration-range"><span title="고객이 한 경로를 지날 때의 설정 대기 범위입니다. 야간 제한·처리 지연은 제외합니다.">경로별 대기 ⓘ</span><strong className="j-duration-total">{durationText}</strong></div>
-      <p><span />고객당 하나의 경로 · Push</p>
+      <p><span />고객당 하나의 경로</p>
     </div></aside>
 
     <JourneyCanvas definition={definition} selectedId={selectedId} supportedTypes={capabilities?.supported_node_types}

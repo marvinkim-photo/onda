@@ -324,6 +324,18 @@ export class OndaClient {
       this.request<{ subject?: string; html: string }>("POST", `/v1/apps/${appId}/email-templates/preview`, input),
   };
 
+  /**
+   * 발송기 카탈로그 — 이 배포에서 고를 수 있는 커넥터.
+   * 콘솔의 "벤더 선택 → 설정 입력"이 이 응답만으로 그려진다(폼은 credentials_schema로 렌더).
+   */
+  readonly connectors = {
+    catalog: (channel?: string) =>
+      this.request<{ connectors: ConnectorCatalogEntry[] }>(
+        "GET",
+        `/v1/connectors${channel ? `?channel=${encodeURIComponent(channel)}` : ""}`,
+      ),
+  };
+
   readonly alimtalk = {
     /** 채널 → 커넥터 배선 조회 (Owner/Admin) — 미배선이면 404 */
     connector: {
@@ -368,9 +380,22 @@ export class OndaClient {
           "GET",
           `/v1/apps/${appId}/alimtalk/templates${params?.sender_id ? `?sender_id=${params.sender_id}` : ""}`,
         ),
-      /** P1 미구현 — 현재는 501을 반환한다 (콘솔은 안내 문구로 처리) */
-      sync: (appId: string) =>
-        this.request<{ queued: true }>("POST", `/v1/apps/${appId}/alimtalk/templates/sync`),
+      /**
+       * 벤더 승인 템플릿 동기화 요청 (journeys:write). 202 + 워커가 비동기 수행.
+       *
+       * 발신프로필·커넥터 배선·검증된 크리덴셜이 모두 있어야 202가 나온다. 하나라도 없으면
+       * 400과 함께 무엇이 없는지 한국어로 지목한다 — 워커가 아무것도 못 하는 상태에서
+       * 202를 주면 "요청됐다"는 거짓 신호가 되기 때문이다.
+       *
+       * sender_id 생략 시: 기본 발신프로필, 없고 하나뿐이면 그 하나. 여러 개인데 기본이
+       * 없으면 400으로 되묻는다.
+       */
+      sync: (appId: string, body?: { sender_id?: string }) =>
+        this.request<{ accepted: true; sender_id: string }>(
+          "POST",
+          `/v1/apps/${appId}/alimtalk/templates/sync`,
+          body,
+        ),
     },
   };
 
@@ -699,13 +724,54 @@ export interface EmailTemplate {
 export interface AlimtalkCredentialInput {
   kind: "alimtalk";
   connector_id: string;
-  api_key: string;
+  /**
+   * 흔한 이름일 뿐 모든 벤더가 쓰는 이름이 아니다. 이 슬롯에 대응하는 필드가 없는
+   * 벤더도 있으므로 선택이며, 서버는 "슬롯이든 extra든 비밀이 하나라도 있으면 된다"까지만 강제한다.
+   */
+  api_key?: string;
   secret_key?: string;
   sender_key?: string;
   base_url?: string;
+  /**
+   * 매니페스트가 선언한 필드를 **이름 그대로** 담는다. 벤더가 실제로 읽는 값이다
+   * (NHN은 app_key, 다른 딜러사는 또 다르다). 저장 시 펼쳐지며 이름 있는 슬롯이 이긴다.
+   *
+   * 슬롯 넷만으로는 제3자 벤더가 다섯 번째 비밀을 선언하는 순간 저장할 방법이 없어져
+   * "매니페스트만 있으면 벤더가 들어온다"는 계약이 닫히지 않는다.
+   */
+  extra?: Record<string, string>;
 }
 
 /** 앱별 채널 → 커넥터 배선. config는 비밀이 아닌 설정만(비밀은 credentials에). */
+/**
+ * 커넥터 매니페스트의 콘솔용 투영. 단일 출처는 배포의 매니페스트 디렉터리이고,
+ * API와 워커가 같은 디렉터리를 읽는다.
+ *
+ * 여기 있다고 발송이 되는 것은 아니다 — in_process_go 커넥터는 워커 바이너리에 구현이
+ * 포함돼 있어야 하며, 없으면 워커가 기동에서 실패한다.
+ */
+export interface ConnectorCatalogEntry {
+  id: string;
+  name: string;
+  description?: string;
+  version: string;
+  channel: string;
+  vendor: { name: string; url?: string; support?: string };
+  tier?: string;
+  runtime: "in_process_go" | "remote_http";
+  /** 크리덴셜 입력 폼을 그리는 JSON Schema. 벤더마다 필드가 달라 폼을 손으로 짤 수 없다. */
+  credentials_schema: unknown;
+  /** 비밀이 아닌 앱 단위 설정 폼 (발신번호·기본 발신프로필 등) */
+  config_schema?: unknown;
+  capabilities: Record<string, unknown>;
+  /** 이 커넥터가 보고할 수 있는 상태. 리포트가 "미지원"과 "0"을 구분하는 근거. */
+  reports: string[];
+  /** 웹훅형이면 등록할 경로 조각. 없으면 폴링형이라 등록할 것이 없다. */
+  callback_path?: string;
+  compliance?: Record<string, unknown>;
+  cost?: Record<string, unknown>;
+}
+
 export interface ChannelConnector {
   id: string;
   channel: string;

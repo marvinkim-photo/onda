@@ -135,3 +135,38 @@ func (r *resolver) seed(tenantID, appID, ch string, b binding, found bool, note 
 	r.cache[tenantID+"/"+appID+"/"+ch] = cachedBinding{b: b, found: found, note: note, loadedAt: r.clk.Now()}
 	r.mu.Unlock()
 }
+
+// --- 다른 패키지용 공개 표면 -------------------------------------------------
+//
+// 배선 해석(channel_connectors + credentials + 복호화)은 발송 워커·결과 폴러·템플릿 동기화가
+// 모두 필요로 한다. 복사하면 크리덴셜 캐시 TTL·미해석 사유 문구가 셋으로 갈라지므로,
+// 내부 resolver를 그대로 감싼 얇은 공개 타입만 덧붙인다(기존 호출부는 손대지 않는다).
+
+// Binding — 해석된 커넥터 배선 한 건(복호화된 크리덴셜 포함).
+type Binding struct {
+	ConnectorID string
+	// Config — channel_connectors.config (비밀 아닌 앱 단위 설정).
+	Config []byte
+	// Credential — 복호화된 credentials.ciphertext. 로그에 남기면 안 된다.
+	Credential []byte
+}
+
+// Resolver — (tenant, app, channel) → Binding. 내부 캐시(10분)를 공유한다.
+type Resolver struct{ r *resolver }
+
+// NewResolver — pg가 nil이면 항상 미해석("pg 미주입")을 돌려준다(테스트용).
+func NewResolver(pg *pgxpool.Pool, masterKey []byte, clk clock.Clock) *Resolver {
+	return &Resolver{r: newResolver(pg, masterKey, clk)}
+}
+
+// Resolve — found=false는 "설정이 안 됐다"이지 "장애"가 아니다. note가 그 사유다.
+func (r *Resolver) Resolve(ctx context.Context, tenantID, appID, ch string) (Binding, bool, string, error) {
+	b, found, note, err := r.r.resolve(ctx, tenantID, appID, ch)
+	if err != nil || !found {
+		return Binding{}, false, note, err
+	}
+	return Binding{ConnectorID: b.ConnectorID, Config: b.Config, Credential: b.Credential}, true, note, nil
+}
+
+// CredentialKind — 채널 → credentials.kind (kakao_alimtalk → alimtalk).
+func CredentialKind(ch string) string { return credentialKind(ch) }

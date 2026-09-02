@@ -339,8 +339,14 @@ function CanvasContent({ definition, selectedId, segmentName, editable, supporte
       let detail = "";
       let needsSetup = false;
       if (node.type === "message") {
-        if (node.email) {
-          kindLabel = "이메일 메시지"; // 채널에 맞춘 종류 라벨 (기본값은 푸시)
+        if (node.alimtalk) {
+          kindLabel = "알림톡 메시지"; // 채널에 맞춘 종류 라벨 (기본값은 푸시)
+          title = node.alimtalk.template_code || "승인 템플릿 선택";
+          // 발송기는 노드가 아니라 앱의 채널 배선이 정한다 — 벤더를 바꿔도 저니는 그대로다.
+          detail = "알림톡 · 승인 템플릿";
+          needsSetup = !node.alimtalk.sender_id?.trim() || !node.alimtalk.template_code?.trim();
+        } else if (node.email) {
+          kindLabel = "이메일 메시지";
           title = node.email.subject || "새 이메일 메시지";
           detail = "이메일 · " + (node.email.provider || "활성 발송기");
           needsSetup = !node.email.subject.trim() || !node.email.html.trim();

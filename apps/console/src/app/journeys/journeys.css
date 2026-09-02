@@ -81,35 +81,19 @@
 .j-readonly-label { color: var(--j-muted); font-size: 12px; margin-right: 6px; }
 
 .j-editor { display: flex; flex-direction: column; height: 100dvh; min-height: 680px; }
-.j-editor-heading { padding: 18px 28px 20px; border-bottom: 1px solid var(--j-border); flex-shrink: 0; }
-.j-editor-name-row { display: flex; align-items: center; gap: 16px; }
-.j-name-input {
-  width: 460px;
-  max-width: calc(100% - 90px);
-  min-width: 0;
-  height: 39px;
-  margin-left: -7px;
-  padding: 2px 7px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--j-text);
-  font-size: 25px;
-  font-weight: 650;
-  letter-spacing: -.8px;
-  text-overflow: ellipsis;
-}
-.j-name-input:hover:not(:disabled), .j-name-input:focus { background: var(--j-canvas); border-color: var(--j-border); }
-.j-name-input::placeholder { color: #8c9da4; font-weight: 500; }
-.j-name-input:disabled { opacity: 1; -webkit-text-fill-color: var(--j-text); }
-.j-editor-heading > p { margin-top: 5px; color: var(--j-muted); font-size: 12px; }
+.j-editor-current { display: inline-flex; min-width: 0; align-items: center; gap: 9px; }
+.j-topbar-name { width: clamp(150px, 19vw, 260px); min-width: 0; height: 34px; padding: 3px 6px; overflow: hidden; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--j-text); font: inherit; font-size: 13px; font-weight: 650; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.j-topbar-name:hover:not(:disabled), .j-topbar-name:focus { outline: none; border-color: var(--j-border); background: var(--j-canvas); }
+.j-topbar-name:focus-visible { outline: 3px solid #58b7ac75; outline-offset: 2px; border-color: var(--j-accent); }
+.j-topbar-name::placeholder { color: #8c9da4; font-weight: 500; }
+.j-topbar-name:disabled { opacity: 1; -webkit-text-fill-color: var(--j-text); }
 .j-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 5px; background: #f0f4f5; color: #75838a; font-size: 11px; font-weight: 500; white-space: nowrap; }
 .j-status > span { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .j-status-active { background: var(--j-accent-soft); color: var(--j-accent); }
 .j-status-paused { background: var(--j-amber-soft); color: var(--j-amber); }
 .j-status-archived { background: #f3f4f6; color: #849099; }
 
-.j-editor-workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 216px minmax(0, 1fr) 320px; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.j-editor-workspace { flex: 1; min-height: 0; display: grid; grid-template-columns: 220px minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
 .j-editor-workspace > * { min-width: 0; }
 .j-editor-workspace > .j-inspector { min-height: 0; overflow-y: auto; border-left: 1px solid var(--j-border); scrollbar-width: thin; }
 .j-palette { display: flex; flex-direction: column; justify-content: space-between; gap: 20px; padding: 21px 18px 19px; border-right: 1px solid var(--j-border); overflow-y: auto; scrollbar-width: thin; }
@@ -213,7 +197,9 @@
   .j-palette-add small, .j-palette-add > svg { display: none; }
   .j-palette-add { min-height: 55px; }
   .j-breadcrumb-current, .j-breadcrumb-slash { display: none; }
-  .j-topbar, .j-editor-heading { padding-inline: 23px; }
+  .j-editor .j-breadcrumb-current, .j-editor .j-breadcrumb-slash { display: inline-flex; }
+  .j-editor .j-topbar-name { width: 138px; }
+  .j-topbar { padding-inline: 23px; }
 }
 
 @media (max-width: 760px) {
@@ -224,16 +210,14 @@
   .j-brand svg { width: 26px; }
   .j-breadcrumb-divider { margin-left: 3px; }
   .j-breadcrumb-current, .j-breadcrumb-slash { display: none; }
+  .j-editor .j-breadcrumb-current, .j-editor .j-breadcrumb-slash { display: inline-flex; }
+  .j-editor .j-topbar-name { width: min(180px, 42vw); }
   .j-topbar-actions { width: 100%; justify-content: flex-end; }
   .j-save-state, .j-readonly-label { margin-right: auto; font-size: 10px; }
   .j-button { min-height: 39px; font-size: 12px; padding-inline: 13px; }
   .j-undo-button { padding-inline: 10px; }
   .j-undo-button > span { display: none; }
   .j-topbar-actions { flex-wrap: wrap; }
-  .j-editor-heading { padding: 16px 18px 20px; }
-  .j-name-input { width: 100%; font-size: 21px; letter-spacing: -.6px; }
-  .j-editor-name-row { gap: 9px; }
-  .j-editor-heading > p { font-size: 11px; line-height: 1.8; }
   .j-editor-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; overflow: visible; }
   .j-editor-workspace > .j-canvas { height: 500px; min-height: 500px; }
   .j-editor-workspace > .j-inspector { height: auto; overflow: visible; border-left: 0; border-top: 1px solid var(--j-border); }

@@ -85,16 +85,51 @@ const emailResendPayloadSchema = z.object({
  * 알리고 apikey+userid, Solapi apiKey+apiSecret), 각 벤더는 manifest.credentials.schema로
  * 자기 스키마를 선언한다. 엄격한 벤더별 검증은 워커가 manifest로 수행한다.
  */
+/**
+ * 알림톡 크리덴셜.
+ *
+ * 이름 있는 네 슬롯은 흔한 형태를 위한 편의이고, **정본은 extra다.** 벤더는 자기 manifest가
+ * 선언한 필드명 그대로 읽는다(NHN은 app_key, 다른 딜러사는 또 다르다). 슬롯만 두면
+ * 제3자 벤더가 다섯 번째 비밀을 선언하는 순간 콘솔에서 저장할 방법이 없어지고,
+ * 그러면 "매니페스트만 있으면 벤더가 들어온다"는 계약이 닫히지 않는다.
+ *
+ * 저장 시 extra를 펼치고 슬롯이 이깁니다 — 같은 키가 양쪽에 있으면 슬롯 값을 쓴다.
+ */
 const alimtalkPayloadSchema = z.object({
   kind: z.literal("alimtalk"),
   connector_id: z
     .string()
     .regex(/^[a-z][a-z0-9_]{1,63}$/, "connector_id는 ^[a-z][a-z0-9_]{1,63}$ 형식이어야 합니다"),
-  api_key: z.string().min(1).max(512),
+  // api_key는 흔한 이름일 뿐 모든 벤더가 쓰는 이름이 아니다. 이걸 필수로 두면
+  // api_key에 대응하는 필드가 없는 벤더는 콘솔이 아무 값이나 슬롯에 밀어 넣어야 저장된다.
+  // 그건 콘솔이 서버 제약을 우회하는 것이므로, 서버가 "비밀이 하나라도 있으면 된다"로 완화한다.
+  api_key: z.string().min(1).max(512).optional(),
   secret_key: z.string().max(512).optional(),
   sender_key: z.string().max(256).optional(),
   base_url: z.string().url().optional(),
+  /** 매니페스트가 선언한 필드를 이름 그대로. 벤더가 실제로 읽는 값이다. */
+  extra: z.record(z.string().max(4096)).optional(),
 });
+
+/** 예약 키 — extra가 덮어쓰면 안 되는 이름들. */
+const RESERVED_CREDENTIAL_KEYS = new Set(["kind", "connector_id", "extra"]);
+
+/**
+ * 저장 형태로 펼친다. extra를 바닥에 깔고 이름 있는 슬롯을 위에 얹는다.
+ * 벤더는 평평한 JSON 하나만 보므로 슬롯이든 extra든 구분할 필요가 없다.
+ */
+export function flattenCredentialPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const { extra, ...named } = payload as { extra?: Record<string, string> } & Record<string, unknown>;
+  if (!extra) return named;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(extra)) {
+    if (!RESERVED_CREDENTIAL_KEYS.has(k)) out[k] = v;
+  }
+  for (const [k, v] of Object.entries(named)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
 
 /** 테스트에서 직접 검증한다 — 크리덴셜 폼의 계약이 컨트롤러 경유 없이 회귀 가능해야 한다. */
 export const credentialSchema = z.discriminatedUnion("kind", [
@@ -104,7 +139,19 @@ export const credentialSchema = z.discriminatedUnion("kind", [
   emailNhnPayloadSchema,
   emailResendPayloadSchema,
   alimtalkPayloadSchema,
-]);
+]).superRefine((v, ctx) => {
+  // 알림톡은 벤더마다 비밀 필드 이름이 달라 특정 슬롯을 필수로 둘 수 없다.
+  // "무엇이든 하나는 있어야 한다"까지만 강제하고, 무엇이 필요한지는 매니페스트가 정한다.
+  if (v.kind !== "alimtalk") return;
+  const hasSlot = Boolean(v.api_key || v.secret_key);
+  const hasExtra = Boolean(v.extra && Object.keys(v.extra).length > 0);
+  if (!hasSlot && !hasExtra) {
+    ctx.addIssue({
+      code: "custom",
+      message: "벤더 크리덴셜이 비어 있습니다 — 매니페스트가 요구하는 값을 입력하세요",
+    });
+  }
+});
 
 /** 크리덴셜 관리 (세션 인증 — 콘솔 온보딩 위저드의 백엔드) */
 @Controller("v1/apps/:appId/credentials")
@@ -130,7 +177,10 @@ export class CredentialsController {
     }
 
     const { kind, ...payload } = parsed.data;
-    const env = encryptEnvelope(loadMasterKey(), JSON.stringify(payload));
+    const env = encryptEnvelope(
+      loadMasterKey(),
+      JSON.stringify(flattenCredentialPayload(payload as Record<string, unknown>)),
+    );
     const { rows } = await this.pg.query(
       `INSERT INTO credentials (tenant_id, app_id, kind, ciphertext, dek_wrapped, status, status_detail)
        VALUES ($1, $2, $3, $4, $5, 'unverified', NULL)

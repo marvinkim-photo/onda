@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://onda.dev/schemas/queue/alimtalk.template.sync.v1.json",
+  "title": "AlimtalkTemplateSyncV1Payload",
+  "description": "알림톡 승인 템플릿 동기화 잡 v1. 콘솔/API가 발행하고 channel 역할 워커가 소비한다. 벤더 API 호출과 크리덴셜 복호화는 워커 런타임 전용이므로(PRD-04 3장) API는 이 잡만 싣는다. 발신프로필 단위로 한 건 — 벤더의 ListTemplates가 senderKey 단위이기 때문이다.",
+  "type": "object",
+  "required": ["app_id", "sender_id", "sender_key", "connector_id", "requested_by", "requested_at"],
+  "properties": {
+    "app_id": { "type": "string", "format": "uuid" },
+    "sender_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "alimtalk_senders.id — 동기화 결과의 upsert 대상 스코프"
+    },
+    "sender_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "발신프로필 키(NHN senderKey / 알리고 senderkey). 벤더 조회 인자이며 sender_id 행에서 복사한다."
+    },
+    "connector_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$",
+      "description": "발행 시점 channel_connectors 배선. 워커는 자기 배선을 다시 읽지만 배선이 바뀌면 로그로 드러내기 위해 못박아 싣는다."
+    },
+    "requested_by": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "요청한 멤버(members.id). 자동 동기화 등 사람이 아닌 요청은 null."
+    },
+    "requested_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

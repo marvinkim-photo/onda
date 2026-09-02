@@ -33,6 +33,7 @@ const validate = (id: string, data: unknown) => {
 const SEND = "https://onda.dev/schemas/queue/send.message.v1.json";
 const MANIFEST = "https://onda.dev/schemas/connector/manifest.v0.json";
 const LIFECYCLE = "https://onda.dev/schemas/queue/message.lifecycle.v1.json";
+const TPLSYNC = "https://onda.dev/schemas/queue/alimtalk.template.sync.v1.json";
 
 describe("schemas compile", () => {
   it("모든 schemas/*.schema.json 이 2020-12로 컴파일된다", () => {
@@ -58,6 +59,45 @@ describe("examples validate", () => {
     const r = validate(LIFECYCLE, load(examplesDir, "message.lifecycle.delivered.json"));
     expect(r.errors).toBeNull();
     expect(r.ok).toBe(true);
+  });
+  it("alimtalk.template.sync 예시", () => {
+    const r = validate(TPLSYNC, load(examplesDir, "alimtalk.template.sync.json"));
+    expect(r.errors).toBeNull();
+    expect(r.ok).toBe(true);
+  });
+});
+
+describe("alimtalk.template.sync 계약", () => {
+  const base = () => load(examplesDir, "alimtalk.template.sync.json");
+
+  it("sender_key가 없으면 거절된다 — 벤더 ListTemplates의 유일한 조회 인자다", () => {
+    const m = base();
+    delete m.sender_key;
+    expect(validate(TPLSYNC, m).ok).toBe(false);
+  });
+
+  it("sender_id가 없으면 거절된다 — upsert 스코프가 사라져 템플릿이 어느 발신프로필 것인지 모른다", () => {
+    const m = base();
+    delete m.sender_id;
+    expect(validate(TPLSYNC, m).ok).toBe(false);
+  });
+
+  it("requested_by는 null이 허용된다 (사람이 아닌 자동 요청)", () => {
+    const m = base();
+    m.requested_by = null;
+    expect(validate(TPLSYNC, m).ok).toBe(true);
+  });
+
+  it("크리덴셜을 잡에 싣는 필드는 존재하지 않는다 (복호화는 워커 전용)", () => {
+    const m = base();
+    m.credential = { api_key: "x" };
+    expect(validate(TPLSYNC, m).ok).toBe(false);
+  });
+
+  it("connector_id 형식은 manifest.id와 같은 제약이다", () => {
+    const m = base();
+    m.connector_id = "NHN-Cloud";
+    expect(validate(TPLSYNC, m).ok).toBe(false);
   });
 });
 
@@ -120,6 +160,16 @@ describe("contract invariants", () => {
     }
     expect((payloadSchemas["send.message"] as { $id: string }).$id).toBe(SEND);
     expect((payloadSchemas["message.lifecycle"] as { $id: string }).$id).toBe(LIFECYCLE);
+  });
+
+  it("payloadSchemas의 모든 type이 envelope.type enum에 있다 (한쪽만 등록 = 발행 즉시 실패)", () => {
+    const envelope = load(schemasDir, "envelope.schema.json");
+    const declared: string[] = envelope.properties.type.enum;
+    for (const type of Object.keys(payloadSchemas)) {
+      expect(declared, type).toContain(type);
+    }
+    expect(declared).toContain("alimtalk.template.sync");
+    expect((payloadSchemas["alimtalk.template.sync"] as { $id: string }).$id).toBe(TPLSYNC);
   });
 
   it("lifecycle failed 이벤트 상태 enum은 manifest.lifecycle.reports enum과 같다", () => {

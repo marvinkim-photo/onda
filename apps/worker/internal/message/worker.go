@@ -34,6 +34,9 @@ type Job struct {
 	Config      []byte
 	Vendor      alimtalk.Vendor
 	Manifest    connector.Manifest
+	// Template — 캐시된 승인 템플릿(alimtalk_templates). nil이면 아직 동기화되지 않았다는 뜻이며,
+	// 그때는 발송 전 검증을 건너뛴다 (template_guard.go).
+	Template *alimtalk.Template
 	// Note — 해석 실패·불일치 사유. credential_missing 종결 시 로그·lifecycle detail로 흐른다.
 	Note string
 }
@@ -111,6 +114,10 @@ func (w *Worker) Resolve(ctx context.Context, env *libqueue.Envelope, job *Job) 
 	job.Config = b.Config
 	job.Vendor = v
 	job.Manifest = v.Manifest()
+	// 승인 템플릿 캐시본을 여기서 실어 둔다 — Send는 벤더 호출 직전에 이걸로 검증한다.
+	if tmpl := job.P.Content.Template; tmpl != nil {
+		job.Template = w.loadStoredTemplate(ctx, env.TenantID, env.AppID, senderKeyFor(job), tmpl.Code)
+	}
 	return channel.Credentials{Kind: credentialKind(job.P.Channel), JSON: b.Credential}, true, nil
 }
 
@@ -123,6 +130,11 @@ func (w *Worker) Send(ctx context.Context, _ *libqueue.Envelope, job *Job, creds
 	}
 	req, err := w.buildRequest(job)
 	if err != nil {
+		return "", err
+	}
+	// 승인 본문 대조는 벤더에 가기 전에. 공급자 거절과 과금을 아끼고, 무엇보다
+	// 미승인 템플릿이 실제로 발송되는 일을 막는다.
+	if err := w.guardTemplate(job, req); err != nil {
 		return "", err
 	}
 	req.Credential = vendorCredential(job, creds)
@@ -148,10 +160,7 @@ func (w *Worker) buildRequest(job *Job) (alimtalk.SendRequest, error) {
 	if p.Target.Value == "" {
 		return alimtalk.SendRequest{}, channel.NewSendError(channel.FailureInvalidTarget, "수신 번호 없음")
 	}
-	senderKey := tmpl.SenderKey
-	if senderKey == "" {
-		senderKey = configString(job.Config, "sender_key")
-	}
+	senderKey := senderKeyFor(job)
 	if senderKey == "" {
 		return alimtalk.SendRequest{}, channel.NewSendError(channel.FailurePermanentContent,
 			"발신프로필 키 없음 (content.template.sender_key 또는 커넥터 config.sender_key)")

@@ -30,9 +30,13 @@ export function graphReadIssue(definition: GraphDefinition): string | null {
     for (const node of definition.nodes) {
       if (!NODE_TOOLS.some((tool) => tool.type === node.type)) return "현재 콘솔에서 지원하지 않는 단계가 포함되어 있습니다. 원본은 변경하지 않았습니다.";
       if (node.type === "message") {
+        // 채널은 푸시·이메일·알림톡 셋 중 하나. 알림톡을 빼면 알림톡 저니가 통째로
+        // "연결을 읽을 수 없음"으로 잠긴다 — 워커 쪽에도 같은 누락이 있었다.
         const okPush = typeof node.push?.title === "string" && typeof node.push?.body === "string";
         const okEmail = typeof node.email?.subject === "string" && typeof node.email?.html === "string";
-        if (!okPush && !okEmail) return fail;
+        const okAlimtalk = typeof node.alimtalk?.sender_id === "string"
+          && typeof node.alimtalk?.template_code === "string";
+        if (!okPush && !okEmail && !okAlimtalk) return fail;
       }
       if (node.type === "branch" && (!Array.isArray(node.condition?.groups) || node.condition.groups.some((group) => !Array.isArray(group.conditions) ||
         group.conditions.some((condition) => !condition || (condition.type === "attribute" && typeof condition.key !== "string") ||

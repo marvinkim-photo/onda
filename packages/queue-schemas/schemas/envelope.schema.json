@@ -9,7 +9,7 @@
     "id": { "type": "string", "format": "uuid" },
     "type": {
       "type": "string",
-      "enum": ["ingest.batch", "event.normalized", "journey.enter", "journey.wake", "dispatch.fanout", "send.push", "send.email", "send.message", "message.lifecycle", "feedback.token"]
+      "enum": ["ingest.batch", "event.normalized", "journey.enter", "journey.wake", "dispatch.fanout", "send.push", "send.email", "send.message", "message.lifecycle", "feedback.token", "alimtalk.template.sync"]
     },
     "schema_ver": { "type": "integer", "minimum": 1 },
     "tenant_id": { "type": "string", "format": "uuid" },

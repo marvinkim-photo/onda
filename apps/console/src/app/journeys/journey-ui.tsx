@@ -42,7 +42,7 @@ export function JourneyIcon({ name, size = 20, className }: {
   );
 }
 
-export function JourneyTopbar({ actions, current }: { actions?: ReactNode; current?: string }) {
+export function JourneyTopbar({ actions, current }: { actions?: ReactNode; current?: ReactNode }) {
   return (
     <header className="j-topbar">
       <nav className="j-breadcrumbs" aria-label="현재 위치">

@@ -1,0 +1,81 @@
+{
+  "manifest_version": 0,
+  "id": "alimtalk_nhn",
+  "name": "카카오 알림톡 (NHN Cloud Bizmessage)",
+  "description": "NHN Cloud KakaoTalk Bizmessage v2.3 딜러사. 치환은 templateParameter(공급자 렌더), 결과는 웹훅이 없어 단건 조회 폴링으로 수집한다. 대체발송(resendParameter)을 공급자가 직접 수행한다.",
+  "version": "0.1.0",
+  "channel": "kakao_alimtalk",
+  "vendor": {
+    "name": "NHN Cloud",
+    "url": "https://www.nhncloud.com/kr/service/notification/kakaotalk-bizmessage",
+    "support": "https://docs.nhncloud.com/ko/Notification/KakaoTalk%20Bizmessage/ko/alimtalk-api-guide/"
+  },
+  "license": "Apache-2.0",
+  "tier": "core",
+  "runtime": {
+    "type": "in_process_go",
+    "go_package": "github.com/ondahq/onda/apps/worker/internal/channel/alimtalk/nhn",
+    "timeout_ms": 10000
+  },
+  "target_types": ["phone"],
+  "capabilities": {
+    "content": ["template", "buttons"],
+    "silent": false,
+    "fallback_source": false,
+    "scheduled_send": true,
+    "batch_max": 1000,
+    "async_receipt": true,
+    "test_send": true,
+    "substitution": "variables",
+    "vendor_fallback": true,
+    "lifecycle_mode": "polling"
+  },
+  "credentials": {
+    "schema": {
+      "type": "object",
+      "required": ["app_key", "secret_key"],
+      "properties": {
+        "app_key": { "type": "string", "title": "AppKey (URL 경로에 실린다)" },
+        "secret_key": { "type": "string", "title": "SecretKey (X-Secret-Key 헤더)", "x-secret": true },
+        "sender_key": { "type": "string", "title": "카카오 발신프로필 키 (senderKey)" },
+        "base_url": { "type": "string", "title": "API 베이스 URL (미지정 시 공식 엔드포인트)" }
+      },
+      "additionalProperties": false
+    },
+    "validate": true
+  },
+  "config": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "sender_key": { "type": "string", "title": "카카오 발신프로필 키 (비밀이 아니라 여기에 둘 수 있다)" },
+        "base_url": { "type": "string", "title": "API 베이스 URL" },
+        "sms_fallback_sender": { "type": "string", "title": "대체발송 발신번호 (사전 등록된 번호)" }
+      }
+    }
+  },
+  "lifecycle": {
+    "reports": ["accepted", "sent", "delivered", "failed"]
+  },
+  "limits": {
+    "retry": { "max_attempts": 3, "base_backoff_ms": 1000, "circuit_breaker": true }
+  },
+  "compliance": {
+    "regions": ["KR"],
+    "marketing_allowed": false,
+    "requires_template_approval": true,
+    "pii_in_transit": ["phone"]
+  },
+  "cost": { "currency": "KRW", "per_message": 8.0 },
+  "contract_tests": [
+    "validate_credentials",
+    "send_ok",
+    "send_invalid_target",
+    "send_rate_limited",
+    "send_permanent_content",
+    "callback_parse",
+    "idempotent_resend",
+    "unsupported_content",
+    "fallback_trigger"
+  ]
+}

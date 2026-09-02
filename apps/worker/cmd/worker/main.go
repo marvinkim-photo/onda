@@ -28,6 +28,7 @@ import (
 	"github.com/ondahq/onda/apps/worker/internal/lifecycle"
 	"github.com/ondahq/onda/apps/worker/internal/message"
 	"github.com/ondahq/onda/apps/worker/internal/segment"
+	"github.com/ondahq/onda/apps/worker/internal/templatesync"
 	"github.com/ondahq/onda/apps/worker/internal/trigger"
 	libqueue "github.com/ondahq/onda/packages/libqueue-go"
 )
@@ -150,6 +151,7 @@ func run(role string, logger *slog.Logger) error {
 			probe.markFailed("consumer_email")
 			probe.markFailed("consumer_message")
 			probe.markFailed("poller_receipts")
+			probe.markFailed("consumer_template_sync")
 			if role == "channel" {
 				logger.Error("channel 역할은 마스터키 필수 — readiness 차단", "err", err)
 			} else {
@@ -214,6 +216,22 @@ func run(role string, logger *slog.Logger) error {
 				name:       "consumer_message",
 				initialize: messageQueue.EnsureGroup,
 				run:        messageLoop.Run,
+			})
+
+			// 알림톡 승인 템플릿 동기화 — API가 발행한 잡을 받아 벤더 목록을 alimtalk_templates에 캐시한다.
+			// 이 캐시가 있어야 ValidateSend가 승인 본문 기준으로 검증하고, 완성 본문을 요구하는
+			// 벤더(substitution=rendered)에 보낼 전문을 만들 수 있다.
+			tplSyncQueue := libqueue.NewConsumer(rdb, libqueue.StreamAlimtalkTemplateSync,
+				libqueue.GroupAlimtalkTemplateSync, "tplsync-"+hostname)
+			tplSyncer := templatesync.NewSyncer(
+				message.NewResolver(pg, masterKey, clk), registry, templatesync.NewStore(pg), clk,
+				logger.With("component", "template-sync"))
+			tplSync := templatesync.NewConsumer(tplSyncQueue, tplSyncer, clk,
+				logger.With("component", "template-sync"))
+			startWorkerComponent(g, gctx, probe, logger, workerComponent{
+				name:       "consumer_template_sync",
+				initialize: tplSyncQueue.EnsureGroup,
+				run:        tplSync.Run,
 			})
 
 			// 폴링형 벤더의 결과 확정기. 폴링 커넥터가 없어도 돌지만 만기 행이 없어 무해하다.
@@ -298,7 +316,7 @@ func requiredWorkerComponents(role string) []string {
 	if has("channel") {
 		components = append(components,
 			"consumer_lifecycle", "connector_runtime", "consumer_push", "consumer_email",
-			"consumer_message", "poller_receipts",
+			"consumer_message", "poller_receipts", "consumer_template_sync",
 		)
 	}
 	if has("scheduler") {

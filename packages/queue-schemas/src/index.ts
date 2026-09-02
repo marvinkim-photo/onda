@@ -22,6 +22,8 @@ export const STREAMS = {
   /** 발송 수명주기 (message.lifecycle.v1) — 커넥터·콜백·SDK가 수렴 */
   messageLifecycle: "stream:message.lifecycle",
   feedback: "stream:feedback",
+  /** 알림톡 승인 템플릿 동기화 잡 — API가 발행, channel 워커가 소비 */
+  alimtalkTemplateSync: "stream:alimtalk.template.sync",
 } as const;
 
 export type StreamKey = (typeof STREAMS)[keyof typeof STREAMS];
@@ -37,6 +39,7 @@ export const CONSUMER_GROUPS = {
   channelMessage: "cg:channel.message",
   lifecycle: "cg:lifecycle",
   feedback: "cg:feedback",
+  alimtalkTemplateSync: "cg:alimtalk.template.sync",
 } as const;
 
 /** stream:events payload — 정규화된 단일 이벤트 (트리거 진입·이탈 매칭용) */
@@ -64,7 +67,8 @@ export type MessageType =
   | "send.email"
   | "send.message"
   | "message.lifecycle"
-  | "feedback.token";
+  | "feedback.token"
+  | "alimtalk.template.sync";
 
 /** 모든 큐 메시지의 공통 envelope (DEV-MAIN §5) */
 export interface Envelope<P = Record<string, unknown>> {
@@ -241,6 +245,23 @@ export interface MessageLifecyclePayload {
   click_ref?: string | null;
 }
 
+/**
+ * alimtalk.template.sync payload v1 — 발신프로필 한 건의 승인 템플릿 동기화 요청.
+ * 벤더 호출·크리덴셜 복호화는 워커 전용이라 API는 이 잡만 싣는다 (PRD-04 3장).
+ */
+export interface AlimtalkTemplateSyncPayload {
+  app_id: string;
+  /** alimtalk_senders.id — upsert 스코프 */
+  sender_id: string;
+  /** 벤더 ListTemplates 조회 인자 (NHN senderKey / 알리고 senderkey) */
+  sender_key: string;
+  /** 발행 시점 channel_connectors 배선 (워커가 자기 배선과 대조해 드리프트를 로그로 드러낸다) */
+  connector_id: string;
+  /** 요청한 멤버(members.id). 사람이 아닌 요청은 null */
+  requested_by: string | null;
+  requested_at: string;
+}
+
 function loadSchema(name: string): Record<string, unknown> {
   // dist/index.js 기준 ../schemas — package files에 schemas/ 포함
   const path = join(__dirname, "..", "schemas", name);
@@ -258,4 +279,5 @@ export const payloadSchemas: Partial<Record<MessageType, Record<string, unknown>
   "journey.enter": loadSchema("journey.entry.schema.json"),
   "send.message": loadSchema("send.message.v1.schema.json"),
   "message.lifecycle": loadSchema("message.lifecycle.v1.schema.json"),
+  "alimtalk.template.sync": loadSchema("alimtalk.template.sync.v1.schema.json"),
 };

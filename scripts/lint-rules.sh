@@ -47,9 +47,11 @@ while IFS= read -r f; do
     *ated/*|*/clock/*|*_test.go) continue ;;
     */cmd/worker/*|*/cmd/seed/*|*/cmd/loadgen/*) continue ;;
   esac
-  if [[ "$f" == *.go ]] && grep -n 'time\.Now()' "$f" >/dev/null; then
+  # 주석은 제외한다(sed로 //~줄끝 제거 — 행 수는 보존되므로 줄번호가 맞다).
+  # 규칙 자체를 설명하는 주석이 위반으로 잡히던 오탐을 막는다.
+  if [[ "$f" == *.go ]] && sed 's://.*::' "$f" | grep -n 'time\.Now()' >/dev/null; then
     echo "RULE-3 위반: $f — time.Now() 직접 호출 (clock.Clock 주입 사용)"
-    grep -n 'time\.Now()' "$f" | head -3
+    sed 's://.*::' "$f" | grep -n 'time\.Now()' | head -3
     fail=1
   fi
 done < <(src_files)

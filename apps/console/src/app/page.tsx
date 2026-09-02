@@ -111,9 +111,14 @@ export default function DashboardPage() {
             앱 설정
           </Button>
           {me.data.permissions?.includes("journeys:read") && (
-            <Button variant="outline" onClick={() => router.push("/email-templates")}>
-              이메일 템플릿
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => router.push("/email-templates")}>
+                이메일 템플릿
+              </Button>
+              <Button variant="outline" onClick={() => router.push("/channels/alimtalk")}>
+                알림톡 설정
+              </Button>
+            </>
           )}
           {me.data.permissions?.includes("journeys:activate") && (
             <Button variant="outline" disabled={sweep.isPending} onClick={() => sweep.mutate()}>

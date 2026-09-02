@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { EMAIL_PROVIDER_LABELS, type EmailProvider, type SegmentSummary } from "@onda/api-client";
 import type { MessageNode, DelayNode, JourneyNode } from "@onda/journey-model";
@@ -11,6 +11,10 @@ import { ABSplitSettings, EventWaitSettings, JourneyConditionEditor, RouteSettin
 import { canMoveNode, outgoingEdges, type GraphDefinition, type PublishedABNodes } from "./journey-graph";
 import { DURATION_UNITS, durationUnit, formatDuration } from "./journey-editor-model";
 import { JourneyIcon, type JourneyIconName } from "./journey-ui";
+import { JourneyEmailTemplateSheet } from "./JourneyEmailTemplateSheet";
+import { AlimtalkMessageFields } from "./JourneyAlimtalkFields";
+import { withMessageChannel, type MessageChannel } from "./alimtalk-variables";
+import { importEmailTemplateZip, type ImportedEmailTemplate } from "./email-template-zip";
 import "./journey-inspector.css";
 
 export interface JourneyInspectorProps {
@@ -96,7 +100,7 @@ export function JourneyInspector({
           <span className="j-inspector-icon"><JourneyIcon name={icon} size={23} /></span>
           <div>
             <p className="j-inspector-eyebrow">
-              {index >= 0 ? `단계 · ${selectedId.slice(-6)}` : kind === "entry" ? "저니의 시작" : "저니의 마무리"}
+              {index >= 0 ? `${index + 1}번째 단계` : kind === "entry" ? "저니의 시작" : "저니의 마무리"}
             </p>
             <h2 id={`${fieldId}-heading`}>{content.title}</h2>
           </div>
@@ -351,35 +355,41 @@ function ExitSettings({ definition, editable, onUpdate, id }: {
   );
 }
 
+const CHANNEL_LABELS: Record<MessageChannel, string> = { push: "푸시", email: "이메일", alimtalk: "알림톡" };
+
 function MessageSettings({ node, index, editable, onUpdate, id }: {
   node: MessageNode; index: number; editable: boolean; onUpdate: UpdateDefinition; id: string;
 }) {
-  const channel: "push" | "email" = node.email ? "email" : "push";
+  // 채널은 정확히 하나. 셋 다 비어 있는 새 노드는 푸시로 읽는다.
+  const channel: MessageChannel = node.alimtalk ? "alimtalk" : node.email ? "email" : "push";
 
-  function setChannel(next: "push" | "email") {
+  function setChannel(next: MessageChannel) {
     if (next === channel) return;
     onUpdate((draft) => {
       const current = draft.nodes[index];
       if (current?.type !== "message") return;
-      draft.nodes[index] = next === "email"
-        ? { id: current.id, type: "message", email: { subject: "", html: "" } }
-        : { id: current.id, type: "message", push: { title: "", body: "" } };
+      // 다른 채널의 키를 남기면 messageChannel이 null이 되고 발행 검증이 막힌다.
+      draft.nodes[index] = { ...withMessageChannel({ id: current.id, type: "message" }, next), id: current.id };
     });
   }
 
   return (
     <>
       <Field id={`${id}-channel`} label="채널">
-        <div className="j-inspector-segmented" role="group" aria-label="발송 채널">
-          <button type="button" disabled={!editable} aria-pressed={channel === "push"}
-            className={channel === "push" ? "is-active" : undefined} onClick={() => setChannel("push")}>푸시</button>
-          <button type="button" disabled={!editable} aria-pressed={channel === "email"}
-            className={channel === "email" ? "is-active" : undefined} onClick={() => setChannel("email")}>이메일</button>
+        <div className="j-inspector-segmented j-inspector-segmented-3" role="group" aria-label="발송 채널">
+          {(["push", "email", "alimtalk"] as const).map((option) => (
+            <button key={option} type="button" disabled={!editable} aria-pressed={channel === option}
+              className={channel === option ? "is-active" : undefined} onClick={() => setChannel(option)}>
+              {CHANNEL_LABELS[option]}
+            </button>
+          ))}
         </div>
       </Field>
-      {channel === "email"
-        ? <EmailMessageFields node={node} index={index} editable={editable} onUpdate={onUpdate} id={id} />
-        : <PushMessageFields node={node} index={index} editable={editable} onUpdate={onUpdate} id={id} />}
+      {channel === "alimtalk"
+        ? <AlimtalkMessageFields node={node} index={index} editable={editable} onUpdate={onUpdate} id={id} />
+        : channel === "email"
+          ? <EmailMessageFields node={node} index={index} editable={editable} onUpdate={onUpdate} id={id} />
+          : <PushMessageFields node={node} index={index} editable={editable} onUpdate={onUpdate} id={id} />}
     </>
   );
 }
@@ -393,7 +403,11 @@ function PushMessageFields({ node, index, editable, onUpdate, id }: {
     onUpdate((draft) => {
       const current = draft.nodes[index];
       if (current?.type === "message") {
-        draft.nodes[index] = { ...current, push: { ...(current.push ?? { title: "", body: "" }), [field]: value }, email: undefined };
+        // 다른 채널의 키를 남기지 않는다 — 메시지 노드는 정확히 하나의 채널만 채워야 한다.
+        draft.nodes[index] = {
+          ...current, push: { ...(current.push ?? { title: "", body: "" }), [field]: value },
+          email: undefined, alimtalk: undefined,
+        };
       }
     });
   }
@@ -447,6 +461,14 @@ function EmailMessageFields({ node, index, editable, onUpdate, id }: {
   const subject = node.email?.subject ?? "";
   const html = node.email?.html ?? "";
   const provider = node.email?.provider ?? "";
+  const fileInput = useRef<HTMLInputElement>(null);
+  const previewButton = useRef<HTMLButtonElement>(null);
+  const importGeneration = useRef(0);
+  const [sourceMode, setSourceMode] = useState<"html" | "zip">("html");
+  const [importedTemplate, setImportedTemplate] = useState<ImportedEmailTemplate | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const creds = useQuery({
     queryKey: ["credentials", appId],
     queryFn: () => api.credentials.list(appId!),
@@ -461,10 +483,60 @@ function EmailMessageFields({ node, index, editable, onUpdate, id }: {
       const current = draft.nodes[index];
       if (current?.type === "message") {
         const base = current.email ?? { subject: "", html: "" };
-        draft.nodes[index] = { ...current, email: { ...base, ...patch }, push: undefined };
+        draft.nodes[index] = { ...current, email: { ...base, ...patch }, push: undefined, alimtalk: undefined };
       }
     });
   }
+
+  async function readZip(file: File | undefined) {
+    if (!file || !editable) return;
+    const generation = ++importGeneration.current;
+    setSourceMode("zip");
+    setSheetOpen(false);
+    setImporting(true);
+    setImportError(null);
+    try {
+      const imported = await importEmailTemplateZip(file);
+      if (generation !== importGeneration.current) return;
+      setImportedTemplate(imported);
+      setSheetOpen(true);
+    } catch (error) {
+      if (generation !== importGeneration.current) return;
+      setImportedTemplate(null);
+      setSheetOpen(false);
+      setImportError(error instanceof Error ? error.message : "ZIP 템플릿을 불러오지 못했습니다.");
+    } finally {
+      if (generation === importGeneration.current) {
+        setImporting(false);
+        if (fileInput.current) fileInput.current.value = "";
+      }
+    }
+  }
+
+  function onFileChange(event: ChangeEvent<HTMLInputElement>) {
+    void readZip(event.currentTarget.files?.[0]);
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    void readZip(event.dataTransfer.files?.[0]);
+  }
+
+  function chooseZip() {
+    if (editable && !importing) fileInput.current?.click();
+  }
+
+  function closeSheet() {
+    setSheetOpen(false);
+    window.requestAnimationFrame(() => previewButton.current?.focus());
+  }
+
+  function chooseAnotherZip() {
+    setSheetOpen(false);
+    window.requestAnimationFrame(() => fileInput.current?.click());
+  }
+
+  const templateApplied = Boolean(importedTemplate && importedTemplate.html === html);
 
   return (
     <>
@@ -472,11 +544,56 @@ function EmailMessageFields({ node, index, editable, onUpdate, id }: {
         <input id={`${id}-email-subject`} value={subject} maxLength={998} disabled={!editable}
           placeholder="{{first_name}}님, 안녕하세요" onChange={(e) => change({ subject: e.currentTarget.value })} />
       </Field>
-      <Field id={`${id}-email-html`} label="HTML 본문 ({{변수}} 가능)">
-        <textarea id={`${id}-email-html`} value={html} rows={8} disabled={!editable}
-          className="j-inspector-code" placeholder="<h1>안녕하세요 {{first_name}}님</h1>"
-          onChange={(e) => change({ html: e.currentTarget.value })} />
-      </Field>
+      <div className="j-inspector-field">
+        <div className="j-inspector-label-row">
+          <span className="j-inspector-group-label" id={`${id}-email-source-label`}>작성 방식</span>
+        </div>
+        <div className="j-inspector-segmented j-email-source-switch" role="group" aria-labelledby={`${id}-email-source-label`}>
+          <button type="button" disabled={!editable} aria-pressed={sourceMode === "html"}
+            className={sourceMode === "html" ? "is-active" : undefined} onClick={() => setSourceMode("html")}>HTML 직접 작성</button>
+          <button type="button" disabled={!editable} aria-pressed={sourceMode === "zip"}
+            className={sourceMode === "zip" ? "is-active" : undefined} onClick={() => {
+              setSourceMode("zip");
+              if (importedTemplate) setSheetOpen(true);
+            }}>ZIP 템플릿</button>
+        </div>
+      </div>
+      {sourceMode === "html" ? (
+        <Field id={`${id}-email-html`} label="HTML 본문 ({{변수}} 가능)">
+          <textarea id={`${id}-email-html`} value={html} rows={8} disabled={!editable}
+            className="j-inspector-code" placeholder="<h1>안녕하세요 {{first_name}}님</h1>"
+            onChange={(e) => change({ html: e.currentTarget.value })} />
+          {importedTemplate && <p className="j-inspector-help">가져온 템플릿도 여기에서 계속 수정할 수 있습니다.</p>}
+        </Field>
+      ) : (
+        <div className="j-template-import-field">
+          <input ref={fileInput} id={`${id}-email-zip`} className="j-template-file-input" type="file" tabIndex={-1} hidden
+            accept=".zip,application/zip" disabled={!editable || importing} onChange={onFileChange} />
+          {importedTemplate ? (
+            <div className="j-template-imported-summary">
+              <span className="j-template-imported-icon"><JourneyIcon name="check" size={17} /></span>
+              <div><strong>{importedTemplate.archiveName}</strong><p>
+                {templateApplied ? "현재 HTML에 적용됨" : "적용 전"} · 파일 {importedTemplate.fileCount}개
+              </p></div>
+              <button ref={previewButton} type="button" disabled={!editable} onClick={() => setSheetOpen(true)}>미리보기</button>
+            </div>
+          ) : (
+            <div className={`j-template-dropzone${importError ? " has-error" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
+              <span><JourneyIcon name="message" size={20} /></span>
+              <strong>{importing ? "ZIP 압축을 확인하는 중…" : "ZIP 템플릿 가져오기"}</strong>
+              <p>{importing ? "파일 수와 크기, HTML 안전성을 검사합니다." : "index.html과 이미지·CSS를 하나의 ZIP으로 올려 주세요."}</p>
+              <button type="button" className="j-button" disabled={!editable || importing} onClick={chooseZip}>
+                {importing ? "불러오는 중…" : "ZIP 파일 선택"}
+              </button>
+            </div>
+          )}
+          {importError && <p className="j-template-import-error" role="alert">{importError}</p>}
+          {importedTemplate && <button type="button" className="j-template-change-file" disabled={!editable || importing} onClick={chooseZip}>
+            다른 ZIP 파일 선택
+          </button>}
+          <p className="j-inspector-help">적용 전 별도 화면에서 데스크톱·모바일 미리보기를 확인합니다.</p>
+        </div>
+      )}
       <Field id={`${id}-email-provider`} label="발송기">
         <select id={`${id}-email-provider`} value={provider} disabled={!editable}
           onChange={(e) => change({ provider: (e.currentTarget.value || undefined) as EmailProvider | undefined })}>
@@ -486,6 +603,13 @@ function EmailMessageFields({ node, index, editable, onUpdate, id }: {
       </Field>
       {verified.length === 0 && (
         <Note>검증된 이메일 발송기가 없습니다 — &lsquo;이메일 템플릿 &gt; 이메일 발송기&rsquo;에서 먼저 등록·검증하세요.</Note>
+      )}
+      {sheetOpen && importedTemplate && (
+        <JourneyEmailTemplateSheet template={importedTemplate} onCancel={closeSheet}
+          onChooseAnother={chooseAnotherZip} onApply={() => {
+            change({ html: importedTemplate.html });
+            closeSheet();
+          }} />
       )}
     </>
   );

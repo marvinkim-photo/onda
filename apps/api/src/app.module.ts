@@ -9,6 +9,7 @@ import { AuthService } from "./auth/auth.service";
 import { SessionService } from "./auth/session.service";
 import { TotpService } from "./auth/totp.service";
 import { TotpController, MemberTotpController } from "./auth/totp.controller";
+import { ConnectorCatalogController } from "./connectors/catalog.controller";
 import { AuditService } from "./audit/audit.service";
 import { AuditController } from "./audit/audit.controller";
 import { TenantController } from "./tenant/tenant.controller";
@@ -44,6 +45,7 @@ import { PermissionGuard } from "./authz/permission.guard";
   imports: [InfraModule],
   controllers: [
     HealthController,
+    ConnectorCatalogController,
     AuthController,
     BootstrapController,
     TotpController,

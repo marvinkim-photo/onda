@@ -33,7 +33,7 @@
 .j-inspector-content { display: flex; flex-direction: column; gap: 18px; padding: 20px; }
 .j-inspector-field { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 .j-inspector-label-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
-.j-inspector label { font-size: 12px; font-weight: 650; line-height: 1.5; color: var(--j-text, #394e57); }
+.j-inspector label, .j-inspector-group-label { font-size: 12px; font-weight: 650; line-height: 1.5; color: var(--j-text, #394e57); }
 .j-inspector-counter, .j-inspector-optional { flex-shrink: 0; font-size: 11px; line-height: 1.5; color: var(--j-muted, #8c99a1); font-variant-numeric: tabular-nums; }
 .j-inspector input, .j-inspector textarea, .j-inspector select { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid var(--j-border, #e1e8eb); border-radius: 8px; padding: 11px 12px; color: var(--j-text, #172b32); background: var(--j-surface, #fff); font: inherit; font-size: 14px; line-height: 1.5; transition: border-color .15s, box-shadow .15s; }
 .j-inspector select { min-height: 44px; padding-right: 25px; cursor: pointer; }
@@ -147,6 +147,28 @@
 .j-route-field { display: flex; flex-direction: column; gap: 7px; }
 .j-route-field > span { font-size: 11px; color: var(--j-inspector-tint); font-weight: 600; }
 .j-route-field select { min-width: 0; font-size: 12px; }
+.j-inspector-segmented { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 3px; border: 1px solid var(--j-border); border-radius: 9px; background: var(--j-inspector-subtle); }
+.j-inspector-segmented button { min-width: 0; min-height: 38px; padding: 7px 9px; border: 0; border-radius: 6px; background: transparent; color: var(--j-muted); font: inherit; font-size: 12px; font-weight: 550; line-height: 1.4; white-space: nowrap; }
+.j-inspector-segmented button.is-active { background: var(--j-surface); color: var(--j-inspector-tint); box-shadow: 0 1px 3px rgb(23 43 50 / 9%); }
+.j-inspector-segmented button:disabled { opacity: .48; }
+.j-email-source-switch button { font-size: 11px; }
+.j-inspector-code { min-height: 170px !important; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important; font-size: 12px !important; line-height: 1.65 !important; }
+.j-template-import-field { --j-muted: #5d7078; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.j-template-dropzone { display: flex; min-height: 190px; align-items: center; justify-content: center; flex-direction: column; padding: 20px 16px; border: 1px dashed #b9cdca; border-radius: 10px; background: #f8fbfa; color: var(--j-text); text-align: center; }
+.j-template-dropzone.has-error { border-color: #df9b8b; background: #fff8f6; }
+.j-template-dropzone > span { display: grid; width: 42px; height: 42px; margin-bottom: 12px; place-items: center; border-radius: 11px; background: var(--j-accent-soft); color: var(--j-accent); }
+.j-template-dropzone strong { font-size: 12px; font-weight: 650; }
+.j-template-dropzone p { max-width: 230px; margin: 5px 0 14px; color: var(--j-muted); font-size: 10px; line-height: 1.7; word-break: keep-all; }
+.j-template-dropzone .j-button { min-height: 36px; font-size: 11px; }
+.j-template-imported-summary { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 12px; border: 1px solid #cce3dd; border-radius: 9px; background: #f2f9f7; }
+.j-template-imported-icon { display: grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; border-radius: 9px; background: var(--j-accent-soft); color: var(--j-accent); }
+.j-template-imported-summary > div { flex: 1; min-width: 0; }
+.j-template-imported-summary strong { display: block; overflow: hidden; color: var(--j-text); font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.j-template-imported-summary p { margin: 3px 0 0; color: var(--j-muted); font-size: 10px; }
+.j-template-imported-summary button, .j-template-change-file { min-height: 34px; padding: 6px 9px; border: 1px solid var(--j-border); border-radius: 7px; background: var(--j-surface); color: var(--j-accent); font: inherit; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.j-template-imported-summary button:hover:not(:disabled), .j-template-change-file:hover:not(:disabled) { border-color: #9fc8c3; background: var(--j-accent-soft); }
+.j-template-change-file { align-self: flex-start; background: transparent; }
+.j-template-import-error { margin: 0; color: var(--j-danger); font-size: 11px; line-height: 1.65; word-break: keep-all; }
 
 @media (prefers-color-scheme: dark) {
   .j-inspector { --j-inspector-subtle: #1b2a33; color-scheme: dark; }
@@ -169,8 +191,55 @@
   /* Keep the device illustration light; its notification text uses fixed dark colors. */
   .j-inspector-phone { color-scheme: light; border-color: #344650; background: linear-gradient(150deg, #e5edf5, #f3f7fa 60%, #e7eff3); }
   .j-inspector-notification { background: #fff; border-color: #fff; }
+  .j-template-dropzone { border-color: #45615e; background: #182722; }
+  .j-template-dropzone.has-error { border-color: #734b45; background: #302421; }
+  .j-template-imported-summary { border-color: #31534b; background: #19332d; }
+  .j-template-import-field { --j-muted: #9baeb9; }
+}
+
+@media (max-width: 760px) {
+  .j-email-source-switch button,
+  .j-template-dropzone .j-button,
+  .j-template-imported-summary button,
+  .j-template-change-file { min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .j-inspector *, .j-inspector *::before, .j-inspector *::after { transition: none !important; }
 }
+.j-inspector .j-template-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+/* 알림톡 노드 — 채널이 셋(푸시·이메일·알림톡)이라 세그먼트가 3열이 된다. */
+.j-inspector-segmented-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* 치환자 매핑 — 한 줄에 #{이름} · 값 · 종류. 미매핑은 색으로 드러낸다. */
+.j-alimtalk-vars { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.j-alimtalk-var { display: grid; grid-template-columns: minmax(72px, 30%) minmax(0, 1fr); align-items: center; gap: 6px 8px; }
+.j-alimtalk-var > label { min-width: 0; }
+.j-alimtalk-var code { display: block; overflow-wrap: anywhere; color: var(--j-inspector-tint); font-size: 12px; }
+.j-inspector .j-alimtalk-var input { min-height: 36px; padding: 8px 9px; font-size: 13px; }
+.j-alimtalk-var-kind { grid-column: 2; color: var(--j-muted, #72818b); font-size: 11px; }
+.j-alimtalk-var.is-unmapped .j-alimtalk-var-kind { color: var(--j-danger, #bd5a43); }
+.j-alimtalk-var.is-unmapped input { border-color: var(--j-danger, #bd5a43); }
+
+/* 승인 본문 미리보기 — 줄바꿈을 그대로 보여야 실제 발송과 같은 모양이 된다. */
+.j-alimtalk-preview {
+  margin: 0; padding: 13px 14px; border: 1px solid #f0e2b4; border-radius: 10px;
+  background: #fef9e7; color: #3b3a2f;
+  font: inherit; font-size: 13px; line-height: 1.75;
+  white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere;
+}
+
+.j-alimtalk-fallback-toggle { display: flex; align-items: center; gap: 8px; color: var(--j-text, #172b32); font-size: 13px; }
+.j-inspector .j-alimtalk-fallback-toggle input { width: auto; min-height: 0; }

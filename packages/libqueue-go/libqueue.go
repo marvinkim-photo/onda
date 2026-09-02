@@ -27,19 +27,22 @@ const (
 	StreamSendMessage  = "stream:send.message"      // 채널 중립 발송 (send.message.v1)
 	StreamLifecycle    = "stream:message.lifecycle" // 발송 수명주기 (message.lifecycle.v1)
 	StreamFeedback     = "stream:feedback"
+	// 알림톡 승인 템플릿 동기화 잡 — API가 발행, channel 역할 워커가 소비.
+	StreamAlimtalkTemplateSync = "stream:alimtalk.template.sync"
 )
 
 // Consumer group 이름 — queue-schemas의 CONSUMER_GROUPS와 동일해야 한다.
 const (
-	GroupIngest         = "cg:ingest"
-	GroupTriggerMatcher = "cg:trigger-matcher"
-	GroupScheduler      = "cg:scheduler"
-	GroupFanout         = "cg:fanout"
-	GroupChannel        = "cg:channel"
-	GroupChannelEmail   = "cg:channel.email"
-	GroupChannelMessage = "cg:channel.message"
-	GroupLifecycle      = "cg:lifecycle"
-	GroupFeedback       = "cg:feedback"
+	GroupIngest               = "cg:ingest"
+	GroupTriggerMatcher       = "cg:trigger-matcher"
+	GroupScheduler            = "cg:scheduler"
+	GroupFanout               = "cg:fanout"
+	GroupChannel              = "cg:channel"
+	GroupChannelEmail         = "cg:channel.email"
+	GroupChannelMessage       = "cg:channel.message"
+	GroupLifecycle            = "cg:lifecycle"
+	GroupFeedback             = "cg:feedback"
+	GroupAlimtalkTemplateSync = "cg:alimtalk.template.sync"
 )
 
 // envelopeField는 XADD field-value 쌍의 field 이름 (libqueue-ts와 동일).
