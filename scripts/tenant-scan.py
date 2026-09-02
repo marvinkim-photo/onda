@@ -21,6 +21,8 @@ SCOPED = {
     "member_backup_codes",
     # 신규 테이블(receipt/cursor·저니 노드 실행) — 재검증 R-20
     "event_receipts", "event_customer_cursors", "journey_node_executions",
+    # 알림톡(P0) — 커넥터 배선·발신프로필·승인 템플릿·폴링 접수
+    "channel_connectors", "alimtalk_senders", "alimtalk_templates", "pending_receipts",
     # ClickHouse
     "events", "message_log", "message_lifecycle", "ingestion_errors", "raw_ingestions",
     "attr_changes", "profiles_mirror",

@@ -1,0 +1,62 @@
+{
+  "manifest_version": 0,
+  "id": "alimtalk_mock",
+  "name": "카카오 알림톡 (Mock 벤더)",
+  "description": "계약 검증·E2E 전용 가짜 딜러사. 수신번호 끝 4자리로 결과를 조종한다(패키지 주석의 조종표 참조). 실제 발송은 하지 않는다.",
+  "version": "0.1.0",
+  "channel": "kakao_alimtalk",
+  "vendor": { "name": "Onda", "url": "https://github.com/ondahq/onda-platform", "support": "https://github.com/ondahq/onda-platform/issues" },
+  "license": "Apache-2.0",
+  "tier": "core",
+  "runtime": { "type": "in_process_go", "go_package": "github.com/ondahq/onda/apps/worker/internal/channel/alimtalk/mock", "timeout_ms": 1000 },
+  "target_types": ["phone"],
+  "capabilities": {
+    "content": ["template", "buttons"],
+    "silent": false,
+    "fallback_source": true,
+    "scheduled_send": false,
+    "batch_max": 1,
+    "async_receipt": true,
+    "test_send": true,
+    "substitution": "both",
+    "vendor_fallback": true,
+    "lifecycle_mode": "both"
+  },
+  "credentials": {
+    "schema": {
+      "type": "object",
+      "required": ["api_key", "sender_key"],
+      "properties": {
+        "api_key": { "type": "string", "title": "API Key", "x-secret": true },
+        "sender_key": { "type": "string", "title": "카카오 발신프로필 키" }
+      },
+      "additionalProperties": false
+    },
+    "validate": true
+  },
+  "config": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "default_template_code": { "type": "string" },
+        "sms_fallback_sender": { "type": "string", "title": "SMS 대체발송 발신번호" }
+      }
+    }
+  },
+  "lifecycle": {
+    "reports": ["accepted", "sent", "delivered", "failed"],
+    "callback": { "path": "mock/result", "verify": "token" }
+  },
+  "limits": { "rps": 100, "retry": { "max_attempts": 3, "base_backoff_ms": 1000, "circuit_breaker": true } },
+  "compliance": {
+    "regions": ["KR"],
+    "marketing_allowed": false,
+    "requires_template_approval": true,
+    "ad_label": "none",
+    "unsubscribe": "none",
+    "quiet_hours_default": null,
+    "pii_in_transit": ["phone"]
+  },
+  "cost": { "currency": "KRW", "per_message": 8.0 },
+  "contract_tests": ["validate_credentials", "send_ok", "send_invalid_target", "send_rate_limited", "send_permanent_content", "callback_parse", "idempotent_resend", "unsupported_content", "fallback_trigger"]
+}

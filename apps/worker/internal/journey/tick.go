@@ -198,8 +198,8 @@ func (s *Scheduler) executeNode(ctx context.Context, c *claimedState) error {
 // enqueueSends는 유저의 도달 가능 디바이스마다 send.push outbox 행을 기록한다.
 // 도달성·정책 검사(카테고리 반영)는 메시지 노드 실행 시점 (PRD-03 3.1, 6장).
 func (s *Scheduler) enqueueSends(ctx context.Context, tx pgx.Tx, c *claimedState, def *Definition, node Node, pol *appPolicy) (string, error) {
-	if node.Push == nil && node.Email == nil {
-		return "", fmt.Errorf("message node has no push/email content")
+	if node.Push == nil && node.Email == nil && node.Alimtalk == nil {
+		return "", fmt.Errorf("message node has no push/email/alimtalk content")
 	}
 	cat := policy.Category(def.Settings.Category)
 	marketing := cat != policy.Transactional
@@ -219,6 +219,11 @@ func (s *Scheduler) enqueueSends(ctx context.Context, tx pgx.Tx, c *claimedState
 	// 이메일 노드는 별도 경로 (디바이스 무관, std_attrs.email 대상)
 	if node.Email != nil {
 		return s.enqueueEmail(ctx, tx, c, def, node, pol, cat, marketing, sub, mergeAttrs(stdAttrs, customAttrs))
+	}
+	// 알림톡도 디바이스 무관(std_attrs.phone 대상). category는 저니 설정이 아니라 템플릿 유형이 정하므로
+	// cat/marketing을 넘기지 않고 enqueueAlimtalk이 직접 도출한다.
+	if node.Alimtalk != nil {
+		return s.enqueueAlimtalk(ctx, tx, c, def, node, pol, sub, mergeAttrs(stdAttrs, customAttrs))
 	}
 
 	// marketing이면 push opt-in 필수 (transactional은 우회)
@@ -364,6 +369,12 @@ func (s *Scheduler) logSkip(ctx context.Context, c *claimedState, def *Definitio
 }
 
 func (s *Scheduler) logSkipChannel(ctx context.Context, c *claimedState, def *Definition, status, channel string) {
+	s.logSkipReason(ctx, c, def, status, channel, "")
+}
+
+// logSkipReason은 생략 사유(failure_detail)까지 남긴다. "왜 안 갔는지"가 설정 실수인 경우
+// (템플릿 미승인·발송기 미설정 등) 사유 없이는 콘솔에서 원인을 알 수 없다.
+func (s *Scheduler) logSkipReason(ctx context.Context, c *claimedState, def *Definition, status, channel, detail string) {
 	if s.ch == nil {
 		return
 	}
@@ -375,10 +386,10 @@ func (s *Scheduler) logSkipChannel(ctx context.Context, c *claimedState, def *De
 			journey_id, journey_version, node_index, campaign_ref,
 			user_id, device_id, channel, status, failure_class, failure_detail, sent_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, '00000000-0000-0000-0000-000000000000',
-		        ?, ?, '', '', ?)`,
+		        ?, ?, '', ?, ?)`,
 		c.tenantID, c.appID, uuidString(), idemKey,
 		c.journeyID, uint32(c.version), uint16(c.currentNode),
-		c.userID, channel, status, s.clk.Now())
+		c.userID, channel, status, detail, s.clk.Now())
 	if err != nil {
 		s.logger.Error("skip 로그 기록 실패", "err", err, "state", c.id, "status", status)
 	}

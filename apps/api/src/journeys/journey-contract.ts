@@ -18,6 +18,18 @@ const nodeSchema = z.discriminatedUnion("type", [
       subject: z.string().min(1).max(998), html: z.string().min(1).max(1_000_000),
       provider: z.enum(["email_smtp", "email_nhn", "email_resend"]).optional(),
     }).optional(),
+    // 알림톡: 승인 템플릿을 고르고 치환자만 매핑한다. 본문은 저니가 갖지 않는다(심사 통과본과 일치해야 함).
+    // 벤더는 앱의 채널 배선이 정하므로 노드에 없다 — 벤더를 바꿔도 저니는 그대로다.
+    alimtalk: z.object({
+      sender_id: z.string().uuid(),
+      template_code: z.string().min(1).max(20),
+      variables: z.record(z.string().max(4000)).optional(),
+      fallback: z.object({
+        type: z.enum(["SMS", "LMS"]),
+        title: z.string().max(64).optional(),
+        text: z.string().min(1).max(2000),
+      }).strict().optional(),
+    }).strict().optional(),
   }).strict(),
   z.object({ ...identity, type: z.literal("delay"), duration_seconds: z.number().int() }).strict(),
   z.object({ ...identity, type: z.literal("branch"), condition: z.custom<SegmentDSL>(
@@ -57,9 +69,9 @@ export const definitionSchema = z.object({
   // message 노드는 push 또는 email 중 정확히 하나의 채널을 가져야 한다.
   for (const node of def.nodes) {
     if (node.type !== "message") continue;
-    const channels = (node.push ? 1 : 0) + (node.email ? 1 : 0);
+    const channels = (node.push ? 1 : 0) + (node.email ? 1 : 0) + (node.alimtalk ? 1 : 0);
     if (channels !== 1) {
-      ctx.addIssue({ code: "custom", message: "message 노드는 push 또는 email 중 정확히 하나여야 합니다" });
+      ctx.addIssue({ code: "custom", message: "message 노드는 push · email · alimtalk 중 정확히 하나여야 합니다" });
     }
   }
 });

@@ -41,9 +41,10 @@ type Entry struct {
 type Node struct {
 	ID   string `json:"id,omitempty"`
 	Type string `json:"type"` // message | delay
-	// message — push 또는 email 중 하나 (채널 선택)
-	Push  *PushContent  `json:"push,omitempty"`
-	Email *EmailContent `json:"email,omitempty"`
+	// message — push · email · alimtalk 중 정확히 하나 (채널 선택)
+	Push     *PushContent     `json:"push,omitempty"`
+	Email    *EmailContent    `json:"email,omitempty"`
+	Alimtalk *AlimtalkContent `json:"alimtalk,omitempty"`
 	// delay
 	DurationSeconds int64        `json:"duration_seconds,omitempty"`
 	Condition       *segment.DSL `json:"condition,omitempty"`
@@ -57,6 +58,23 @@ type EmailContent struct {
 	Subject  string `json:"subject"`
 	HTML     string `json:"html"`
 	Provider string `json:"provider,omitempty"` // email_smtp | email_nhn | email_resend | ""(활성)
+}
+
+// AlimtalkContent — 저니 알림톡 노드. 승인 템플릿을 고르고 치환자만 매핑한다.
+// 본문을 노드가 갖지 않는 이유: 알림톡은 카카오 심사를 통과한 템플릿과 정확히 일치해야 한다.
+// 발송 벤더는 앱의 채널 배선(channel_connectors)이 정하므로 노드에 없다.
+type AlimtalkContent struct {
+	SenderID     string            `json:"sender_id"`
+	TemplateCode string            `json:"template_code"`
+	Variables    map[string]string `json:"variables,omitempty"`
+	Fallback     *AlimtalkFallback `json:"fallback,omitempty"`
+}
+
+// AlimtalkFallback — 알림톡 실패 시 문자 대체발송.
+type AlimtalkFallback struct {
+	Type  string `json:"type"` // SMS | LMS
+	Title string `json:"title,omitempty"`
+	Text  string `json:"text"`
 }
 
 type Variant struct {
@@ -256,8 +274,32 @@ func validateReentry(raw json.RawMessage) error {
 func validateNode(n Node) error {
 	switch n.Type {
 	case "message":
-		if n.Push == nil || strings.TrimSpace(n.Push.Title) == "" || strings.TrimSpace(n.Push.Body) == "" {
-			return fmt.Errorf("push title and body are required")
+		// 채널은 정확히 하나. 이전에는 Push만 인정해 이메일 전용 v2 노드가 파싱 단계에서 실패했다.
+		set := 0
+		for _, present := range []bool{n.Push != nil, n.Email != nil, n.Alimtalk != nil} {
+			if present {
+				set++
+			}
+		}
+		if set != 1 {
+			return fmt.Errorf("message node requires exactly one channel (push, email, or alimtalk)")
+		}
+		switch {
+		case n.Alimtalk != nil:
+			if strings.TrimSpace(n.Alimtalk.SenderID) == "" || strings.TrimSpace(n.Alimtalk.TemplateCode) == "" {
+				return fmt.Errorf("alimtalk sender_id and template_code are required")
+			}
+			if n.Alimtalk.Fallback != nil && strings.TrimSpace(n.Alimtalk.Fallback.Text) == "" {
+				return fmt.Errorf("alimtalk fallback text is required")
+			}
+		case n.Email != nil:
+			if strings.TrimSpace(n.Email.Subject) == "" || strings.TrimSpace(n.Email.HTML) == "" {
+				return fmt.Errorf("email subject and html are required")
+			}
+		default:
+			if strings.TrimSpace(n.Push.Title) == "" || strings.TrimSpace(n.Push.Body) == "" {
+				return fmt.Errorf("push title and body are required")
+			}
 		}
 	case "delay":
 		if n.DurationSeconds <= 0 || n.DurationSeconds > maxDurationSeconds {

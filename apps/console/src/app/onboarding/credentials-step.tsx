@@ -15,6 +15,7 @@ const KIND_LABELS: Record<CredentialKind, string> = {
   email_smtp: `이메일 · ${EMAIL_PROVIDER_LABELS.email_smtp}`,
   email_nhn: `이메일 · ${EMAIL_PROVIDER_LABELS.email_nhn}`,
   email_resend: `이메일 · ${EMAIL_PROVIDER_LABELS.email_resend}`,
+  alimtalk: "카카오 알림톡",
 };
 
 /** 위저드 2단계 — 채널 크리덴셜 등록: 푸시(FCM/APNs) + 이메일 발송기(SMTP/SES/Resend/NHN) (PRD-05 3.1). 검증 상태는 5s 폴링. */

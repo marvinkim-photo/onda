@@ -20,6 +20,8 @@ apps/worker/internal/channel/worker.go::7d8537a05f0e   # credentials by app_id+k
 apps/worker/internal/channel/worker.go::9a03cfeef80d   # credentials by app_id+kind (발송 워커, app_id 스코프)
 apps/worker/internal/channel/email_worker.go::d642033bdbb9   # credentials by app_id+email kind(smtp/nhn/resend 폴백) (이메일 발송 워커, app_id 스코프)
 apps/worker/internal/channel/email_worker.go::f53a74bd0975   # credentials by app_id+지정 provider kind (발송별 발송기 선택, app_id 스코프)
+apps/worker/internal/message/resolver.go::9a03cfeef80d   # credentials by app_id+kind (채널 중립 발송 워커, app_id 스코프)
+apps/worker/internal/message/worker.go::7d8537a05f0e   # credentials error 전이 by app_id+kind (채널 중립 발송 워커, app_id 스코프)
 
 # --- 부모 쿼리에서 tenant로 검증된 대상 PK로 후속 조회 ---
 apps/api/src/users/users.controller.ts::b0723bfb96ed   # devices by user_id — 직전 users WHERE id+tenant_id+app_id로 검증(404 else)
@@ -46,6 +48,7 @@ apps/api/src/auth/auth.service.ts::66f6c515dfa7   # members by email — 가입 
 apps/api/src/auth/session.service.ts::838b2746e73e   # sessions revoke by token_hash — 토큰 기반 로그아웃
 
 # --- 워커 백그라운드 잡: 전 테넌트 처리(사용자 비대면) ---
+apps/api/src/health/health.controller.ts::727617fb32e5   # 전역 master key readiness: tenant-independent key로 저장 credential 1건의 AEAD 복호화 확인, 응답에는 고정 상태 코드만 반환
 apps/worker/internal/trigger/index.go::163f880e835a   # journeys 전 테넌트 활성 로드 (트리거 매처)
 apps/worker/internal/channel/verifier.go::6d313e6d367f   # credentials 전 테넌트 unverified 로드 (검증 워커)
 apps/worker/internal/journey/relay.go::7420584b5880   # journey_outbox by id (outbox PK, 릴레이)

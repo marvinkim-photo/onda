@@ -16,6 +16,11 @@ import { EmailTemplatesController } from "./email/email-templates.controller";
 import { TestEmailController } from "./email/test-email.controller";
 import { ResendWebhookController } from "./email/resend-webhook.controller";
 import { UninstallController } from "./messaging/uninstall.controller";
+import {
+  AlimtalkSendersController,
+  AlimtalkTemplatesController,
+  ChannelConnectorsController,
+} from "./alimtalk";
 import { MembersController } from "./members/members.controller";
 import { MembersService } from "./members/members.service";
 import { IngestionService } from "./ingestion/ingestion.service";
@@ -53,6 +58,9 @@ import { PermissionGuard } from "./authz/permission.guard";
     TestEmailController,
     ResendWebhookController,
     UninstallController,
+    ChannelConnectorsController,
+    AlimtalkSendersController,
+    AlimtalkTemplatesController,
     AppsController,
     AppSettingsController,
     SegmentsController,

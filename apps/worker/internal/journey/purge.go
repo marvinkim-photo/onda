@@ -28,6 +28,13 @@ var pgPurgeStmts = []string{
 	`DELETE FROM devices WHERE tenant_id = $1`,
 	`DELETE FROM segments WHERE tenant_id = $1`,
 	`DELETE FROM attribute_registry WHERE tenant_id = $1`,
+	// 알림톡 설정. channel_connectors·alimtalk_senders·alimtalk_templates는 tenants·apps에 FK를 걸므로
+	// 여기서 지우지 않으면 아래 apps/tenants 삭제가 FK 위반으로 실패한다(파기 자체가 깨진다).
+	// pending_receipts는 FK가 없지만 tenant_id를 담은 폴러 임시 행이라 함께 지운다.
+	`DELETE FROM alimtalk_templates WHERE tenant_id = $1`,
+	`DELETE FROM alimtalk_senders WHERE tenant_id = $1`,
+	`DELETE FROM channel_connectors WHERE tenant_id = $1`,
+	`DELETE FROM pending_receipts WHERE tenant_id = $1`,
 	`DELETE FROM credentials WHERE tenant_id = $1`,
 	`DELETE FROM journeys WHERE tenant_id = $1`,
 	`DELETE FROM users WHERE tenant_id = $1`,

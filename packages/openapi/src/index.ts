@@ -324,6 +324,56 @@ export class OndaClient {
       this.request<{ subject?: string; html: string }>("POST", `/v1/apps/${appId}/email-templates/preview`, input),
   };
 
+  readonly alimtalk = {
+    /** 채널 → 커넥터 배선 조회 (Owner/Admin) — 미배선이면 404 */
+    connector: {
+      get: (appId: string, channel: string) =>
+        this.request<ChannelConnector>("GET", `/v1/apps/${appId}/channels/${channel}/connector`),
+      put: (
+        appId: string,
+        channel: string,
+        input: { connector_id: string; config?: Record<string, unknown>; enabled?: boolean },
+      ) =>
+        this.request<ChannelConnector>(
+          "PUT",
+          `/v1/apps/${appId}/channels/${channel}/connector`,
+          input,
+        ),
+    },
+    /** 발신프로필(카카오 채널) — 앱당 여러 개 (journeys:read / journeys:write) */
+    senders: {
+      list: (appId: string) =>
+        this.request<{ senders: AlimtalkSender[] }>("GET", `/v1/apps/${appId}/alimtalk/senders`),
+      create: (
+        appId: string,
+        input: {
+          sender_key: string;
+          channel_name?: string;
+          status?: AlimtalkSenderStatus;
+          is_default?: boolean;
+        },
+      ) => this.request<AlimtalkSender>("POST", `/v1/apps/${appId}/alimtalk/senders`, input),
+      update: (
+        appId: string,
+        id: string,
+        input: { channel_name?: string; status?: AlimtalkSenderStatus; is_default?: boolean },
+      ) => this.request<AlimtalkSender>("PATCH", `/v1/apps/${appId}/alimtalk/senders/${id}`, input),
+      remove: (appId: string, id: string) =>
+        this.request<{ ok: true }>("DELETE", `/v1/apps/${appId}/alimtalk/senders/${id}`),
+    },
+    /** 승인 템플릿 캐시 — Onda는 편집하지 않고 벤더에서 읽어 캐시만 한다 */
+    templates: {
+      list: (appId: string, params?: { sender_id?: string }) =>
+        this.request<{ templates: AlimtalkTemplate[] }>(
+          "GET",
+          `/v1/apps/${appId}/alimtalk/templates${params?.sender_id ? `?sender_id=${params.sender_id}` : ""}`,
+        ),
+      /** P1 미구현 — 현재는 501을 반환한다 (콘솔은 안내 문구로 처리) */
+      sync: (appId: string) =>
+        this.request<{ queued: true }>("POST", `/v1/apps/${appId}/alimtalk/templates/sync`),
+    },
+  };
+
   readonly email = {
     /** 테스트 이메일 발송 — 템플릿/인라인을 {{ }} 치환 후 실전송 (journeys:activate) */
     test: (
@@ -364,7 +414,7 @@ export interface IngestStatus {
 }
 
 /** 크리덴셜 종류 (credentials.kind = PG channel_kind enum) */
-export type CredentialKind = "push_fcm" | "push_apns" | EmailProvider;
+export type CredentialKind = "push_fcm" | "push_apns" | EmailProvider | "alimtalk";
 /** 이메일 발송기(provider) — 저니 이메일 노드·테스트 발송의 provider 값 */
 export type EmailProvider = "email_smtp" | "email_nhn" | "email_resend";
 export const EMAIL_PROVIDERS: readonly EmailProvider[] = ["email_smtp", "email_nhn", "email_resend"];
@@ -379,7 +429,8 @@ export type CredentialInput =
   | ApnsCredentialInput
   | EmailSmtpCredentialInput
   | EmailNhnCredentialInput
-  | EmailResendCredentialInput;
+  | EmailResendCredentialInput
+  | AlimtalkCredentialInput;
 
 export interface CredentialSummary {
   id: string;
@@ -637,6 +688,61 @@ export interface EmailTemplate {
   subject: string;
   html: string;
   created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 알림톡 벤더(딜러사) 크리덴셜. connector_id가 어느 벤더인지 결정한다 —
+ * channel_kind enum에는 'alimtalk' 하나뿐이므로 제3자 벤더도 enum 변경 없이 들어온다.
+ * 필수 필드가 벤더마다 다르므로 느슨하다: 엄격한 검증은 벤더 manifest로 워커가 한다.
+ */
+export interface AlimtalkCredentialInput {
+  kind: "alimtalk";
+  connector_id: string;
+  api_key: string;
+  secret_key?: string;
+  sender_key?: string;
+  base_url?: string;
+}
+
+/** 앱별 채널 → 커넥터 배선. config는 비밀이 아닌 설정만(비밀은 credentials에). */
+export interface ChannelConnector {
+  id: string;
+  channel: string;
+  connector_id: string;
+  config: Record<string, unknown>;
+  enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type AlimtalkSenderStatus = "active" | "disabled";
+
+export interface AlimtalkSender {
+  id: string;
+  sender_key: string;
+  channel_name: string;
+  status: AlimtalkSenderStatus;
+  is_default: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** 카카오 승인 템플릿 캐시. content는 완성 텍스트를 요구하는 벤더를 위한 렌더 원본. */
+export interface AlimtalkTemplate {
+  id: string;
+  sender_id: string;
+  template_code: string;
+  name: string;
+  content: string;
+  message_type: string;
+  emphasize_type: string;
+  variables: string[];
+  buttons: unknown[];
+  quick_replies: unknown[];
+  status: string;
+  vendor_status: string;
+  synced_at: string | null;
   updated_at: string;
 }
 

@@ -1,5 +1,5 @@
 import type { SegmentDSL } from "@onda/segment-dsl";
-import { EMAIL_PROVIDERS, outputPorts, type JourneyDefinition, type JourneyNode, type ValidationIssue } from "./index";
+import { EMAIL_PROVIDERS, messageChannel, outputPorts, type JourneyDefinition, type JourneyNode, type ValidationIssue } from "./index";
 
 const ATTRIBUTE_OPS = new Set([
   "eq", "neq", "gt", "gte", "lt", "lte", "in", "exists", "not_exists", "contains",
@@ -78,13 +78,26 @@ export function validateJourney(def: JourneyDefinition): ValidationIssue[] {
       case "message": {
         hasMessage = true;
         // 채널: push 또는 email 중 하나. 각 채널의 필수 내용이 비면 오류.
-        if (node.email) {
-          if (!node.email.subject?.trim() || !node.email.html?.trim()) fail("빈 이메일 노드입니다", "email");
-          if (node.email.provider !== undefined && !(EMAIL_PROVIDERS as readonly string[]).includes(node.email.provider)) {
-            fail("지원하지 않는 이메일 발송기입니다", "email");
-          }
-        } else if (!node.push?.title?.trim() || !node.push?.body?.trim()) {
-          fail("빈 메시지 노드입니다", "push");
+        // 채널은 정확히 하나. 둘 이상이면 어느 쪽으로 나갈지 모호해진다.
+        switch (messageChannel(node)) {
+          case "email":
+            if (!node.email!.subject?.trim() || !node.email!.html?.trim()) fail("빈 이메일 노드입니다", "email");
+            if (node.email!.provider !== undefined && !(EMAIL_PROVIDERS as readonly string[]).includes(node.email!.provider)) {
+              fail("지원하지 않는 이메일 발송기입니다", "email");
+            }
+            break;
+          case "alimtalk":
+            if (!node.alimtalk!.sender_id?.trim()) fail("발신프로필을 선택하세요", "alimtalk");
+            if (!node.alimtalk!.template_code?.trim()) fail("알림톡 템플릿을 선택하세요", "alimtalk");
+            if (node.alimtalk!.fallback && !node.alimtalk!.fallback.text?.trim()) {
+              fail("대체발송 문구를 입력하세요", "alimtalk");
+            }
+            break;
+          case "push":
+            if (!node.push!.title?.trim() || !node.push!.body?.trim()) fail("빈 메시지 노드입니다", "push");
+            break;
+          default:
+            fail("메시지 노드는 푸시·이메일·알림톡 중 하나여야 합니다");
         }
         break;
       }

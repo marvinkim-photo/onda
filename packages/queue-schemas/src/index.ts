@@ -256,5 +256,6 @@ export const payloadSchemas: Partial<Record<MessageType, Record<string, unknown>
   "send.push": loadSchema("send.push.schema.json"),
   "send.email": loadSchema("send.email.schema.json"),
   "journey.enter": loadSchema("journey.entry.schema.json"),
+  "send.message": loadSchema("send.message.v1.schema.json"),
   "message.lifecycle": loadSchema("message.lifecycle.v1.schema.json"),
 };

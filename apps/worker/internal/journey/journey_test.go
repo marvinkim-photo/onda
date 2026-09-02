@@ -5,11 +5,11 @@ import "testing"
 func TestRender(t *testing.T) {
 	attrs := map[string]string{"first_name": "영주", "city": "서울"}
 	cases := map[string]string{
-		"안녕 {{first_name}}님":              "안녕 영주님",
-		"{{first_name}} @ {{city}}":       "영주 @ 서울",
-		"{{ first_name }} 공백허용":           "영주 공백허용",
-		"{{unknown}} 은 빈값":                " 은 빈값",
-		"변수 없음":                           "변수 없음",
+		"안녕 {{first_name}}님":        "안녕 영주님",
+		"{{first_name}} @ {{city}}": "영주 @ 서울",
+		"{{ first_name }} 공백허용":     "영주 공백허용",
+		"{{unknown}} 은 빈값":          " 은 빈값",
+		"변수 없음":                     "변수 없음",
 	}
 	for tmpl, want := range cases {
 		if got := Render(tmpl, attrs); got != want {

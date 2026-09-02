@@ -77,12 +77,33 @@ const emailResendPayloadSchema = z.object({
   base_url: z.string().url().optional(),
 });
 
-const credentialSchema = z.discriminatedUnion("kind", [
+/**
+ * 카카오 알림톡: 벤더(딜러사) 크리덴셜. 앱당 1개(UNIQUE (app_id, kind))이며
+ * connector_id가 어느 벤더인지 결정한다 — channel_connectors가 아직 없어도 워커가 벤더를 찾는다.
+ *
+ * 스키마를 일부러 느슨하게 둔다: 벤더마다 필요한 비밀이 다르고(NHN appKey+secretKey,
+ * 알리고 apikey+userid, Solapi apiKey+apiSecret), 각 벤더는 manifest.credentials.schema로
+ * 자기 스키마를 선언한다. 엄격한 벤더별 검증은 워커가 manifest로 수행한다.
+ */
+const alimtalkPayloadSchema = z.object({
+  kind: z.literal("alimtalk"),
+  connector_id: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]{1,63}$/, "connector_id는 ^[a-z][a-z0-9_]{1,63}$ 형식이어야 합니다"),
+  api_key: z.string().min(1).max(512),
+  secret_key: z.string().max(512).optional(),
+  sender_key: z.string().max(256).optional(),
+  base_url: z.string().url().optional(),
+});
+
+/** 테스트에서 직접 검증한다 — 크리덴셜 폼의 계약이 컨트롤러 경유 없이 회귀 가능해야 한다. */
+export const credentialSchema = z.discriminatedUnion("kind", [
   fcmPayloadSchema,
   apnsPayloadSchema,
   emailSmtpPayloadSchema,
   emailNhnPayloadSchema,
   emailResendPayloadSchema,
+  alimtalkPayloadSchema,
 ]);
 
 /** 크리덴셜 관리 (세션 인증 — 콘솔 온보딩 위저드의 백엔드) */

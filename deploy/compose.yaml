@@ -124,6 +124,9 @@ services:
     build:
       context: ..
       dockerfile: apps/worker/Dockerfile
+      args:
+        # 기본은 비어 있다. E2E에서만 GO_TAGS=onda_mock으로 목 커넥터를 켠다.
+        GO_TAGS: ${GO_TAGS:-}
     image: onda-worker
     profiles: [app]
     depends_on:
@@ -135,6 +138,10 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       CLICKHOUSE_URL: ${CLICKHOUSE_URL:-http://onda:onda@clickhouse:8123/onda}
       ONDA_MASTER_KEY: ${ONDA_MASTER_KEY:?ONDA_MASTER_KEY 필수}
+      # 커넥터 매니페스트 디렉터리. 여기에 놓인 *.json이 곧 "켜진 커넥터"다.
+      ONDA_CONNECTOR_MANIFESTS: ${ONDA_CONNECTOR_MANIFESTS:-/etc/onda/connectors}
+    volumes:
+      - ${ONDA_CONNECTOR_DIR:-./connectors}:/etc/onda/connectors:ro
     ports:
       - "9090:9090" # /metrics·/healthz
 

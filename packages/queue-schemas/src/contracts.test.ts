@@ -3,6 +3,7 @@ import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020";
 import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
+import { payloadSchemas } from "./index";
 
 /**
  * 커넥터 계약(send.message.v1 · connector.manifest.v0 · message.lifecycle.v1) 검증.
@@ -109,6 +110,16 @@ describe("contract invariants", () => {
     expect(validate(MANIFEST, m).ok).toBe(false);
     m.runtime = { type: "remote_http", endpoint: "https://connector.example.com", auth: "hmac_sha256" };
     expect(validate(MANIFEST, m).ok).toBe(true);
+  });
+
+  it("send.message · message.lifecycle이 payloadSchemas에 등록되어 있다 (등록 누락 = 런타임 무검증)", () => {
+    for (const type of ["send.message", "message.lifecycle"] as const) {
+      const schema = payloadSchemas[type];
+      expect(schema, type).toBeTruthy();
+      expect(ajv.getSchema((schema as { $id: string }).$id), type).toBeTruthy();
+    }
+    expect((payloadSchemas["send.message"] as { $id: string }).$id).toBe(SEND);
+    expect((payloadSchemas["message.lifecycle"] as { $id: string }).$id).toBe(LIFECYCLE);
   });
 
   it("lifecycle failed 이벤트 상태 enum은 manifest.lifecycle.reports enum과 같다", () => {

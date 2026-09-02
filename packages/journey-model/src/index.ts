@@ -27,11 +27,30 @@ interface NodeIdentity { id?: string }
 export const EMAIL_PROVIDERS = ["email_smtp", "email_nhn", "email_resend"] as const;
 export type EmailProvider = (typeof EMAIL_PROVIDERS)[number];
 export type JourneyNode = MessageNode | DelayNode | BranchNode | EventWaitNode | ABSplitNode;
+/**
+ * 알림톡 노드. 승인된 템플릿을 고르고 치환자만 매핑한다.
+ * 본문을 저니에서 쓰지 않는 이유: 알림톡은 카카오 심사를 통과한 템플릿과 정확히 일치해야 한다.
+ * variables 값은 {{프로필속성}} 표기를 쓸 수 있고 발송 시 렌더된다.
+ * 발송기(벤더)는 노드가 아니라 앱의 채널 배선(channel_connectors)이 정한다 — 벤더를 바꿔도 저니는 그대로다.
+ */
+export interface AlimtalkContent {
+  sender_id: string;      // alimtalk_senders.id — 발신프로필
+  template_code: string;  // 승인 템플릿 코드
+  variables?: Record<string, string>;
+  /** 대체발송. 벤더가 지원하면 벤더에 위임하고, 아니면 엔진이 폴백한다. */
+  fallback?: { type: "SMS" | "LMS"; text: string; title?: string };
+}
 export interface MessageNode extends NodeIdentity {
   type: "message";
-  // 채널 선택: push 또는 email 중 정확히 하나.
+  // 채널 선택: push · email · alimtalk 중 정확히 하나.
   push?: { title: string; body: string; image_url?: string; deep_link?: string };
   email?: { subject: string; html: string; provider?: EmailProvider };
+  alimtalk?: AlimtalkContent;
+}
+/** 메시지 노드의 채널. 정확히 하나가 채워져 있어야 한다. */
+export function messageChannel(node: MessageNode): "push" | "email" | "alimtalk" | null {
+  const set = [node.push && "push", node.email && "email", node.alimtalk && "alimtalk"].filter(Boolean);
+  return set.length === 1 ? (set[0] as "push" | "email" | "alimtalk") : null;
 }
 export interface DelayNode extends NodeIdentity {
   type: "delay";
